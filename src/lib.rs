@@ -19,7 +19,7 @@ impl<T:PartialEq+Clone> ConditionVariable<T> {
 		}
 	}
 
-	pub fn set(&mut self, value: T, notify: Notify) {
+	pub fn set(&self, value: T, notify: Notify) {
 		let &(ref lock, ref cvar) = &self.pair;
 
 		let mut data = lock.lock().unwrap();
