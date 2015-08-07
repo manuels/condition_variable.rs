@@ -1,0 +1,10 @@
+[package]
+name = "condition_variable"
+version = "0.1.0"
+description = "Condition Variables (CondVars) made easy"
+homepage = "https://github.com/manuels/condition_variable.rs"
+license = " GPL-2.0"
+authors = ["Manuel Schölling <manuel.schoelling@gmx.de>"]
+
+[dependencies]
+time = "*"
