@@ -40,10 +40,18 @@ impl<T:PartialEq+Clone> ConditionVariable<T> {
 	}
 
 	pub fn wait_for(&self, expected: T) -> Result<(), PoisonError<MutexGuard<T>>> {
+		self.wait_for_in(&[expected])
+	}
+
+	pub fn wait_for_in(&self, expected: &[T]) -> Result<(), PoisonError<MutexGuard<T>>> {
+		self.wait_for_condition(|actual| expected.contains(actual))
+	}
+
+	pub fn wait_for_condition<F:Fn(&T) -> bool>(&self, cond_func: F) -> Result<(), PoisonError<MutexGuard<T>>> {
 		let &(ref lock, ref cvar) = &self.pair;
 		let mut actual = try!(lock.lock());
 		
-		while *actual != expected {
+		while !cond_func(&*actual) {
 			actual = try!(cvar.wait(actual));
 		}
 
@@ -51,11 +59,23 @@ impl<T:PartialEq+Clone> ConditionVariable<T> {
 	}
 
 	pub fn wait_for_ms(&self, expected: T, timeout_ms: i64) -> Result<bool, PoisonError<(MutexGuard<T>,bool)>> {
+		self.wait_for_in_ms(&[expected], timeout_ms)
+	}
+
+	pub fn wait_for_in_ms(&self, expected: &[T], timeout_ms: i64)
+		-> Result<bool, PoisonError<(MutexGuard<T>,bool)>>
+	{
+		self.wait_for_condition_ms(|actual| expected.contains(actual), timeout_ms)
+	}
+
+	pub fn wait_for_condition_ms<F:Fn(&T) -> bool>(&self, cond_func: F, timeout_ms: i64)
+		-> Result<bool, PoisonError<(MutexGuard<T>,bool)>>
+	{
 		let &(ref lock, ref cvar) = &self.pair;
 		let mut actual = lock.lock().unwrap();
 
 		let mut remaining_ms = timeout_ms;
-		while *actual != expected && remaining_ms > 0 {
+		while !cond_func(&*actual) && remaining_ms > 0 {
 			let before_ms = time::precise_time_ns()/1000;
 
 			let (new, _) = try!(cvar.wait_timeout_ms(actual, remaining_ms as u32));
@@ -65,7 +85,7 @@ impl<T:PartialEq+Clone> ConditionVariable<T> {
 			remaining_ms -= (after_ms - before_ms) as i64;
 		}
 
-		Ok(*actual == expected)
+		Ok(cond_func(&*actual))
 	}
 }
 
