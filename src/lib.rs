@@ -1,7 +1,6 @@
-extern crate time;
-
 use std::cmp::PartialEq;
 use std::sync::{Mutex, Condvar, PoisonError, MutexGuard, LockResult};
+use std::time::Instant;
 
 pub enum Notify {
 	One,
@@ -76,13 +75,13 @@ impl<T:PartialEq+Clone> ConditionVariable<T> {
 
 		let mut remaining_ms = timeout_ms;
 		while !cond_func(&*actual) && remaining_ms > 0 {
-			let before_ms = time::precise_time_ns()/1000;
+			let before = Instant::now();
 
 			let (new, _) = try!(cvar.wait_timeout_ms(actual, remaining_ms as u32));
 			actual = new;
 
-			let after_ms = time::precise_time_ns()/1000;
-			remaining_ms -= (after_ms - before_ms) as i64;
+			let elapsed = before.elapsed();
+			remaining_ms -= (elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() / 1000_000) as u64) as i64;
 		}
 
 		Ok(cond_func(&*actual))
@@ -103,7 +102,8 @@ impl ConditionVariable<()> {
 #[cfg(test)]
 mod tests {
 	use std::sync::Arc;
-	use std::thread::{sleep_ms, spawn};
+	use std::thread::{sleep, spawn};
+	use std::time::Duration;
 
 	use ::Notify;
 	use ::ConditionVariable;
@@ -126,7 +126,7 @@ mod tests {
 		let cvar2 = cvar1.clone();
 
 		spawn(move || {
-			sleep_ms(500);
+			sleep(Duration::from_millis(500));
 			cvar2.set(true, Notify::All);
 		});
 
@@ -139,7 +139,7 @@ mod tests {
 		let cvar2 = cvar1.clone();
 
 		spawn(move || {
-			sleep_ms(1000);
+			sleep(Duration::from_millis(1000));
 			cvar2.set(true, Notify::All);
 		});
 
